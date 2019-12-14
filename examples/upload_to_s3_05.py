@@ -8,7 +8,7 @@ import aiobotocore
 AWS_S3_HOST = 'http://localhost:9000'
 AWS_SECRET_ACCESS_KEY = 'FAKE_SECRET_KEY'
 AWS_ACCESS_KEY_ID = 'FAKE_ACCESS_KEY'
-AWS_MULTIPART_BYTES_PER_CHUNK = 5000000  # ~ 5mb
+AWS_MULTIPART_BYTES_PER_CHUNK = 6000000  # ~ 5mb
 AWS_S3_BUCKET_NAME = 'test'
 
 part_info = {
@@ -16,7 +16,7 @@ part_info = {
 }
 
 
-async def upload_chunk(client, file_path, upload_id, chunk_number, bytes_per_chunk, source_size, key):
+async def upload_chunk(client, fp, upload_id, chunk_number, bytes_per_chunk, source_size, key):
     global part_info
     start = time()
     offset = chunk_number * bytes_per_chunk
@@ -24,23 +24,22 @@ async def upload_chunk(client, file_path, upload_id, chunk_number, bytes_per_chu
     bytes_to_read = min([bytes_per_chunk, remaining_bytes])
     part_number = chunk_number + 1
 
-    with open(file_path, 'rb') as fp:
-        fp.seek(offset)
-        data = fp.read(bytes_to_read)
-        resp = await client.upload_part(
-            Bucket=AWS_S3_BUCKET_NAME,
-            Body=data,
-            UploadId=upload_id,
-            PartNumber=part_number,
-            Key=key
-        )
+    fp.seek(offset)
+    data = fp.read(bytes_to_read)
+    resp = await client.upload_part(
+        Bucket=AWS_S3_BUCKET_NAME,
+        Body=data,
+        UploadId=upload_id,
+        PartNumber=part_number,
+        Key=key
+    )
 
-        part_info['Parts'].append(
-            {
-                'PartNumber': part_number,
-                'ETag': resp['ETag']
-            }
-        )
+    part_info['Parts'].append(
+        {
+            'PartNumber': part_number,
+            'ETag': resp['ETag']
+        }
+    )
     print('done in ', time() - start)
 
 
@@ -76,19 +75,20 @@ async def multipart_upload_to_s3(file_path, folder_name,
         # https://github.com/boto/boto3/issues/50#issuecomment-72079954
         global part_info
         tasks = []
-        for chunk_number in range(chunks_count):
-            tasks.append(
-                upload_chunk(
-                    client=client,
-                    file_path=file_path,
-                    chunk_number=chunk_number,
-                    bytes_per_chunk=bytes_per_chunk,
-                    key=key, upload_id=upload_id,
-                    source_size=source_size
+        with open(file_path, 'rb') as fp:
+            for chunk_number in range(chunks_count):
+                tasks.append(
+                    upload_chunk(
+                        client=client,
+                        fp=fp,
+                        chunk_number=chunk_number,
+                        bytes_per_chunk=bytes_per_chunk,
+                        key=key, upload_id=upload_id,
+                        source_size=source_size
+                    )
                 )
-            )
 
-        await asyncio.gather(*tasks)
+            await asyncio.gather(*tasks)
 
         list_parts_resp = await client.list_parts(
             Bucket=AWS_S3_BUCKET_NAME,
@@ -125,7 +125,7 @@ if __name__ == '__main__':
     start = time()
     loop = asyncio.get_event_loop()
     try:
-        loop.run_until_complete(multipart_upload_to_s3('./large.txt', 'testing'))
+        loop.run_until_complete(multipart_upload_to_s3('examples/large.txt', 'testing'))
     except Exception as e:
         print('error: ', e)
     finally:
