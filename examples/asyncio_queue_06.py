@@ -57,6 +57,21 @@ async def main():
 
     print(f"finished at {time.strftime('%X')}")
 
-loop = asyncio.get_event_loop()
-loop.run_until_complete(main())
-loop.run_forever()
+# Starting scheduling coro <coroutine object say_after at 0x105349a40>
+# Done put <coroutine object say_after at 0x105349a40> coro to queue
+# ===========
+# hello task 1 has id 1
+# Starting scheduling coro <coroutine object say_after at 0x105349990>
+# Done put <coroutine object say_after at 0x105349990> coro to queue
+# ===========
+# hello task 2 has id 2
+# [{'id': 1, 'coro': <coroutine object say_after at 0x105349a40>}, {'id': 2, 'coro': <coroutine object say_after at 0x105349990>}]
+# finished at 10:16:43
+# Got coro: <coroutine object say_after at 0x105349a40>
+# Created task: <coroutine object say_after at 0x105349a40>
+# ===========
+# Got coro: <coroutine object say_after at 0x105349990>
+# Created task: <coroutine object say_after at 0x105349990>
+# ===========
+# hello
+# world
